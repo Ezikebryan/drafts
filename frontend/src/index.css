@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #FFFDF5;
+  --color-surface: #FFFFFF;
+  --color-primary: #58CC02;
+  --color-primaryDark: #46A302;
+  --color-secondary: #FFD93D;
+  --color-accentPink: #FF6B6B;
+  --color-accentBlue: #4CC9F0;
+  --color-accentPurple: #C77DFF;
+  --color-text: #1E293B;
+  --color-muted: #94A3B8;
+  --color-lightSquare: #FFF8E7;
+  --color-darkSquare: #FFD6A5;
+  
+  --font-family-sans: Lexend, Poppins, sans-serif;
+  
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
+  
+  --shadow-soft: 0 4px 10px rgba(0,0,0,0.08);
+  --shadow-lift: 0 8px 20px rgba(0,0,0,0.12);
+  --shadow-glow: 0 0 20px rgba(88,204,2,0.3);
+}
+
+/* Duolingo-style background */
+body {
+  background: linear-gradient(135deg, #FFFDF5, #FFF3E0);
+  overflow-x: hidden;
+}
+
+/* Floating bubbles animation */
+.floating-bubble {
+  position: fixed;
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bubble-1 {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle at 30% 30%, rgba(88,204,2,0.3), rgba(88,204,2,0.1));
+  top: 10%;
+  left: 5%;
+  animation: float 6s ease-in-out infinite;
+}
+
+.bubble-2 {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,217,61,0.3), rgba(255,217,61,0.1));
+  top: 60%;
+  right: 10%;
+  animation: float 8s ease-in-out infinite 1s;
+}
+
+.bubble-3 {
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle at 30% 30%, rgba(76,201,240,0.3), rgba(76,201,240,0.1));
+  bottom: 20%;
+  left: 15%;
+  animation: float 7s ease-in-out infinite 2s;
+}
+
+.bubble-4 {
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle at 30% 30%, rgba(199,125,255,0.3), rgba(199,125,255,0.1));
+  top: 30%;
+  right: 20%;
+  animation: float 5s ease-in-out infinite 0.5s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  33% { transform: translateY(-15px) translateX(10px); }
+  66% { transform: translateY(-5px) translateX(-10px); }
+}
+
+/* Hover glow for buttons */
+.btn-glow:hover {
+  box-shadow: 0 0 20px rgba(88,204,2,0.4);
+}
+
+/* Success confetti effect */
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+}
+
+/* Piece animation */
+@keyframes piece-pop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Square board container */
+.square-container {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}

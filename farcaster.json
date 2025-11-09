@@ -1,0 +1,13 @@
+{
+  "name": "Draftsmaster",
+  "version": "0.1.0",
+  "start_url": "/",
+  "description": "On-chain 1v1 checkers miniapp on Base.",
+  "icon_url": "/icon.png",
+  "routes": [
+    { "path": "/", "name": "Play" }
+  ],
+  "embeds": {
+    "initial_path": "/"
+  }
+}
