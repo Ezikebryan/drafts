@@ -23,7 +23,7 @@ export default function CreateGame({ createCode, setCreateCode, onCreateGame, di
         whileTap={{ scale: 0.98 }}
         disabled={disabled}
         onClick={onCreateGame}
-        className="mt-4 w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-primary to-primaryDark text-white text-lg font-bold shadow-lift btn-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="mt-4 w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-primary to-primaryDark text-white text-lg font-bold shadow-lift btn-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
       >
         Create Game (You = Player 1)
       </motion.button>

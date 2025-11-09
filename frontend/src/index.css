@@ -106,3 +106,8 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* Prevent text wrapping for buttons */
+.whitespace-nowrap {
+  white-space: nowrap;
+}

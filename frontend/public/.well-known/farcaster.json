@@ -1,0 +1,15 @@
+{
+  "frame": {
+    "name": "Draftsmaster",
+    "version": "1",
+    "iconUrl": "https://drafts-frontend.vercel.app/icon.png",
+    "homeUrl": "https://drafts-frontend.vercel.app",
+    "imageUrl": "https://drafts-frontend.vercel.app/image.png",
+    "splashImageUrl": "https://drafts-frontend.vercel.app/splash.png",
+    "splashBackgroundColor": "#FFFFFF",
+    "webhookUrl": "https://drafts-frontend.vercel.app/api/webhook",
+    "subtitle": "Play Draftsmaster on Farcaster",
+    "description": "A PvP draughts/checkers game on Base",
+    "primaryCategory": "games"
+  }
+}
