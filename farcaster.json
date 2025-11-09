@@ -1,13 +1,15 @@
 {
-  "name": "Draftsmaster",
-  "version": "0.1.0",
-  "start_url": "/",
-  "description": "On-chain 1v1 checkers miniapp on Base.",
-  "icon_url": "/icon.png",
-  "routes": [
-    { "path": "/", "name": "Play" }
-  ],
-  "embeds": {
-    "initial_path": "/"
+  "frame": {
+    "name": "Draftsmaster",
+    "version": "1",
+    "iconUrl": "https://drafts-frontend.vercel.app/icon.png",
+    "homeUrl": "https://drafts-frontend.vercel.app",
+    "imageUrl": "https://drafts-frontend.vercel.app/image.png",
+    "splashImageUrl": "https://drafts-frontend.vercel.app/splash.png",
+    "splashBackgroundColor": "#FFFFFF",
+    "webhookUrl": "https://drafts-frontend.vercel.app/api/webhook",
+    "subtitle": "Play Draftsmaster on Farcaster",
+    "description": "A PvP draughts/checkers game on Base",
+    "primaryCategory": "games"
   }
 }

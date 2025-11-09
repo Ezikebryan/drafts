@@ -7,6 +7,7 @@ import CreateGame from "./CreateGame";
 import JoinGame from "./JoinGame";
 import GameRoomHeader from "./GameRoomHeader";
 import { motion } from "framer-motion";
+import FarcasterIntegration from "./FarcasterIntegration";
 
 type BoardArray = number[][]; // 8x8
 
@@ -41,6 +42,45 @@ export default function App() {
   const [pending, setPending] = useState<boolean>(false);
   const [moveLog, setMoveLog] = useState<string[]>([]);
   const [validMoves, setValidMoves] = useState<[number, number][]>([]);
+
+  const handleWalletConnected = (address: string) => {
+    setAddr(address);
+    
+    // Initialize ethers provider with the connected wallet
+    const ethereumProvider = (window as any).miniapps?.wallet?.getEthereumProvider?.();
+    if (ethereumProvider) {
+      const p = new ethers.BrowserProvider(ethereumProvider);
+      setProvider(p);
+      
+      (async () => {
+        try {
+          const s = await p.getSigner();
+          setSigner(s);
+          const net = await p.getNetwork();
+          const currentChainId = Number(net.chainId);
+          setChainId(currentChainId);
+          
+          // STRICTLY enforce Base mainnet ONLY
+          if (currentChainId !== 8453) {
+            setStatus("⚠️ Wrong Network! This app only works on Base mainnet. Please switch to Base (chain ID: 8453).");
+          } else {
+            setStatus("Ready to play!");
+          }
+        } catch (error: any) {
+          console.error("Wallet connection error:", error);
+          setStatus("Failed to connect wallet: " + error.message);
+        }
+      })();
+    }
+  };
+
+  const handleWalletDisconnected = () => {
+    setAddr("");
+    setProvider(null);
+    setSigner(null);
+    setChainId(0);
+    setStatus("Wallet disconnected. Please connect to play.");
+  };
 
   useEffect(() => {
     const eth: any = (window as any).ethereum || (window as any).miniapps?.ethereum || null;
@@ -377,6 +417,12 @@ export default function App() {
             Every move is a transaction on Base
           </motion.div>
         </header>
+
+        {/* Farcaster Integration */}
+        <FarcasterIntegration 
+          onWalletConnected={handleWalletConnected}
+          onWalletDisconnected={handleWalletDisconnected}
+        />
 
         <GameRoomHeader addr={addr} chainId={chainId} gameId={gameId} playerColor={playerColor} currentTurn={currentTurn} status={status || (gameActive ? "Active" : "Waiting")} devFee={devFee} />
 
