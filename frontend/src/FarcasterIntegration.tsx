@@ -16,27 +16,6 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
   // Check if we're in a Farcaster environment
   const isFarcasterEnvironment = !!(window as any).miniapps;
 
-  // Initialize the miniapp
-  useEffect(() => {
-    const initMiniApp = async () => {
-      try {
-        // Hide splash screen and display content
-        // Access the SDK through the global window object
-        const sdk = (window as any).miniapps;
-        if (sdk && sdk.actions && sdk.actions.ready) {
-          await sdk.actions.ready();
-        }
-      } catch (error) {
-        console.warn("Failed to initialize miniapp SDK:", error);
-      }
-    };
-    
-    // Only initialize if we're in a Farcaster environment
-    if (isFarcasterEnvironment) {
-      initMiniApp();
-    }
-  }, [isFarcasterEnvironment]);
-
   // Check wallet connection status
   useEffect(() => {
     const checkWalletStatus = async () => {
