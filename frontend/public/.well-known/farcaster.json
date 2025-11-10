@@ -9,7 +9,7 @@
     "splashBackgroundColor": "#FFFFFF",
     "webhookUrl": "https://drafts-frontend.vercel.app/api/webhook",
     "subtitle": "Play Draftsmaster on Farcaster",
-    "description": "A PvP draughts/checkers game on Base",
+    "description": "A PvP draughts or checkers game on Base",
     "primaryCategory": "games"
   }
 }
