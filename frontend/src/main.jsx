@@ -3,76 +3,62 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 
-// Function to detect Farcaster environment and call ready()
-function initializeFarcasterSDK() {
-  // Check if we're in a Farcaster environment
-  const isFarcasterEnv = typeof window !== 'undefined' && (
-    window.miniapps || 
-    window.location.hostname.includes('farcaster') ||
-    window.location.search.includes('farcaster') ||
-    window.location.hash.includes('farcaster')
-  );
-
-  if (isFarcasterEnv) {
-    console.log("Farcaster environment detected");
+// Function to initialize Farcaster SDK properly
+async function initializeFarcasterSDK() {
+  try {
+    // Import the SDK dynamically
+    const { sdk } = await import('@farcaster/miniapp-sdk');
     
-    // Try to call ready() immediately
-    try {
-      if (window.miniapps && window.miniapps.actions && typeof window.miniapps.actions.ready === 'function') {
-        window.miniapps.actions.ready();
-        console.log("Farcaster SDK ready() called immediately");
-        return true;
-      }
-    } catch (error) {
-      console.warn("Immediate ready() call failed:", error);
+    // Call ready() to hide splash screen
+    if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
+      await sdk.actions.ready();
+      console.log("Farcaster SDK ready() called successfully");
+      return true;
     }
-
-    // If not immediately available, wait for it with polling
-    let attempts = 0;
-    const maxAttempts = 100; // 10 seconds with 100ms intervals
+  } catch (error) {
+    console.warn("Failed to import or initialize Farcaster SDK:", error);
     
-    const checkAndReady = () => {
-      attempts++;
+    // Fallback: try to access global SDK if available
+    if (typeof window !== 'undefined' && window.miniapps && 
+        window.miniapps.actions && typeof window.miniapps.actions.ready === 'function') {
       try {
-        if (window.miniapps && window.miniapps.actions && typeof window.miniapps.actions.ready === 'function') {
-          window.miniapps.actions.ready();
-          console.log("Farcaster SDK ready() called after", attempts, "attempts");
-          return;
-        }
-      } catch (error) {
-        console.warn("Ready() call failed on attempt", attempts, ":", error);
+        await window.miniapps.actions.ready();
+        console.log("Farcaster SDK ready() called via global fallback");
+        return true;
+      } catch (fallbackError) {
+        console.error("Fallback ready() call also failed:", fallbackError);
       }
-      
-      if (attempts < maxAttempts) {
-        setTimeout(checkAndReady, 100);
-      } else {
-        console.warn("Farcaster SDK not available after", maxAttempts, "attempts");
-        // Try direct import as last resort
-        try {
-          import('@farcaster/miniapp-sdk').then(({ sdk }) => {
-            if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
-              sdk.actions.ready();
-              console.log("Farcaster SDK ready() called via import");
-            }
-          }).catch(error => {
-            console.error("Failed to import Farcaster SDK:", error);
-          });
-        } catch (importError) {
-          console.error("Failed to dynamically import Farcaster SDK:", importError);
-        }
-      }
-    };
-    
-    // Start polling for the SDK
-    checkAndReady();
-    return true;
+    }
   }
   
   return false;
 }
 
-// Initialize Farcaster SDK detection
-const isFarcasterEnvironment = initializeFarcasterSDK();
+// Initialize Farcaster SDK
+let isFarcasterEnvironment = false;
+
+// Check if we might be in a Farcaster environment
+if (typeof window !== 'undefined') {
+  isFarcasterEnvironment = !!(
+    window.miniapps || 
+    window.location.hostname.includes('farcaster') ||
+    window.location.search.includes('farcaster') ||
+    window.location.hash.includes('farcaster')
+  );
+}
+
+// If we're likely in a Farcaster environment, initialize the SDK
+if (isFarcasterEnvironment) {
+  initializeFarcasterSDK().then(initialized => {
+    if (initialized) {
+      console.log("Farcaster environment initialized");
+    } else {
+      console.log("Not a Farcaster environment or initialization failed");
+    }
+  }).catch(error => {
+    console.error("Error during Farcaster SDK initialization:", error);
+  });
+}
 
 // If not in Farcaster environment, import and use Wagmi
 if (!isFarcasterEnvironment) {
