@@ -1,9 +1,4 @@
 {
-  "accountAssociation": {
-    "header": "eyJmaWQiOjU2MzQyMSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweEJlM2FmN0IwMTFDYzcwMEY5M2JhMzIxZTdmM2E5RTM4OWFiQjA2MjEifQ",
-    "payload": "eyJkb21haW4iOiJkcmFmdHMtZnJvbnRlbmQudmVyY2VsLmFwcCJ9",
-    "signature": "luBCvLfbjTjxNmJnRsZ7T2Y9/iEEx3/TgPXc8PA4/pNyIgByEauZhRBhMiGSBoEojwGRQ9jMb5bmycWg1DzbzRw="
-  },
   "frame": {
     "name": "Draftsmaster",
     "version": "1",
@@ -16,6 +11,10 @@
     "subtitle": "Play Draftsmaster on Farcaster",
     "description": "A PvP draughts or checkers game on Base",
     "primaryCategory": "games"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjU2MzQyMSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweEJlM2FmN0IwMTFDYzcwMEY5M2JhMzIxZTdmM2E5RTM4OWFiQjA2MjEifQ",
+    "payload": "eyJkb21haW4iOiJkcmFmdHMtZnJvbnRlbmQudmVyY2VsLmFwcCJ9",
+    "signature": "luBCvLfbjTjxNmJnRsZ7T2Y9/iEEx3/TgPXc8PA4/pNyIgByEauZhRBhMiGSBoEojwGRQ9jMb5bmycWg1DzbzRw="
   }
-  
 }
