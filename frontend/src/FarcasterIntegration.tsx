@@ -14,7 +14,7 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Check if we're in a Farcaster environment
-  const isFarcasterEnvironment = typeof window !== 'undefined' && (window as any).miniapps;
+  const isFarcasterEnvironment = typeof window !== 'undefined' && !!(window as any).miniapps;
 
   // Check wallet connection status
   useEffect(() => {
@@ -29,16 +29,16 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
         const sdk = (window as any).miniapps;
         
         // Check if wallet is connected
-        const provider = sdk && sdk.wallet && sdk.wallet.getEthereumProvider ? 
-          await sdk.wallet.getEthereumProvider() : null;
-          
-        if (provider) {
-          // Try to get accounts
-          const accounts = await provider.request({ method: 'eth_accounts' }) as string[];
-          if (accounts && accounts.length > 0) {
-            setIsConnected(true);
-            setAddress(accounts[0]);
-            onWalletConnected?.(accounts[0]);
+        if (sdk && sdk.wallet && typeof sdk.wallet.getEthereumProvider === 'function') {
+          const provider = await sdk.wallet.getEthereumProvider();
+          if (provider) {
+            // Try to get accounts
+            const accounts = await provider.request({ method: 'eth_accounts' }) as string[];
+            if (accounts && accounts.length > 0) {
+              setIsConnected(true);
+              setAddress(accounts[0]);
+              onWalletConnected?.(accounts[0]);
+            }
           }
         }
       } catch (err) {
@@ -60,20 +60,23 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
       // Access the SDK through the global window object
       const sdk = (window as any).miniapps;
       
-      const provider = sdk && sdk.wallet && sdk.wallet.getEthereumProvider ? 
-        await sdk.wallet.getEthereumProvider() : null;
-      
-      if (!provider) {
-        throw new Error("No Farcaster wallet provider found");
-      }
-      
-      // Request accounts
-      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
-      
-      if (accounts && accounts.length > 0) {
-        setIsConnected(true);
-        setAddress(accounts[0]);
-        onWalletConnected?.(accounts[0]);
+      if (sdk && sdk.wallet && typeof sdk.wallet.getEthereumProvider === 'function') {
+        const provider = await sdk.wallet.getEthereumProvider();
+        
+        if (!provider) {
+          throw new Error("No Farcaster wallet provider found");
+        }
+        
+        // Request accounts
+        const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
+        
+        if (accounts && accounts.length > 0) {
+          setIsConnected(true);
+          setAddress(accounts[0]);
+          onWalletConnected?.(accounts[0]);
+        }
+      } else {
+        throw new Error("Farcaster wallet not available");
       }
     } catch (err: any) {
       console.error("Error connecting wallet:", err);

@@ -3,38 +3,76 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 
-// Initialize Farcaster SDK if available
-const isFarcasterEnvironment = typeof window !== 'undefined' && window.miniapps;
+// Function to detect Farcaster environment and call ready()
+function initializeFarcasterSDK() {
+  // Check if we're in a Farcaster environment
+  const isFarcasterEnv = typeof window !== 'undefined' && (
+    window.miniapps || 
+    window.location.hostname.includes('farcaster') ||
+    window.location.search.includes('farcaster') ||
+    window.location.hash.includes('farcaster')
+  );
 
-if (isFarcasterEnvironment) {
-  // Call ready() to hide splash screen immediately
-  try {
-    // Try to import the SDK properly
-    import('@farcaster/miniapp-sdk').then(({ sdk }) => {
-      if (sdk && sdk.actions && sdk.actions.ready) {
-        sdk.actions.ready();
-      }
-    }).catch(error => {
-      console.warn("Failed to import Farcaster SDK:", error);
-      // Fallback to direct access
-      const sdk = window.miniapps;
-      if (sdk && sdk.actions && sdk.actions.ready) {
-        sdk.actions.ready();
-      }
-    });
-  } catch (error) {
-    console.warn("Failed to initialize Farcaster SDK:", error);
-    // Fallback to direct access
+  if (isFarcasterEnv) {
+    console.log("Farcaster environment detected");
+    
+    // Try to call ready() immediately
     try {
-      const sdk = window.miniapps;
-      if (sdk && sdk.actions && sdk.actions.ready) {
-        sdk.actions.ready();
+      if (window.miniapps && window.miniapps.actions && typeof window.miniapps.actions.ready === 'function') {
+        window.miniapps.actions.ready();
+        console.log("Farcaster SDK ready() called immediately");
+        return true;
       }
-    } catch (fallbackError) {
-      console.warn("Failed to initialize Farcaster SDK with fallback:", fallbackError);
+    } catch (error) {
+      console.warn("Immediate ready() call failed:", error);
     }
+
+    // If not immediately available, wait for it with polling
+    let attempts = 0;
+    const maxAttempts = 100; // 10 seconds with 100ms intervals
+    
+    const checkAndReady = () => {
+      attempts++;
+      try {
+        if (window.miniapps && window.miniapps.actions && typeof window.miniapps.actions.ready === 'function') {
+          window.miniapps.actions.ready();
+          console.log("Farcaster SDK ready() called after", attempts, "attempts");
+          return;
+        }
+      } catch (error) {
+        console.warn("Ready() call failed on attempt", attempts, ":", error);
+      }
+      
+      if (attempts < maxAttempts) {
+        setTimeout(checkAndReady, 100);
+      } else {
+        console.warn("Farcaster SDK not available after", maxAttempts, "attempts");
+        // Try direct import as last resort
+        try {
+          import('@farcaster/miniapp-sdk').then(({ sdk }) => {
+            if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
+              sdk.actions.ready();
+              console.log("Farcaster SDK ready() called via import");
+            }
+          }).catch(error => {
+            console.error("Failed to import Farcaster SDK:", error);
+          });
+        } catch (importError) {
+          console.error("Failed to dynamically import Farcaster SDK:", importError);
+        }
+      }
+    };
+    
+    // Start polling for the SDK
+    checkAndReady();
+    return true;
   }
+  
+  return false;
 }
+
+// Initialize Farcaster SDK detection
+const isFarcasterEnvironment = initializeFarcasterSDK();
 
 // If not in Farcaster environment, import and use Wagmi
 if (!isFarcasterEnvironment) {
