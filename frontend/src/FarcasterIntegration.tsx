@@ -14,7 +14,7 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Check if we're in a Farcaster environment
-  const isFarcasterEnvironment = !!(window as any).miniapps;
+  const isFarcasterEnvironment = typeof window !== 'undefined' && (window as any).miniapps;
 
   // Check wallet connection status
   useEffect(() => {
@@ -30,7 +30,7 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
         
         // Check if wallet is connected
         const provider = sdk && sdk.wallet && sdk.wallet.getEthereumProvider ? 
-          sdk.wallet.getEthereumProvider() : null;
+          await sdk.wallet.getEthereumProvider() : null;
           
         if (provider) {
           // Try to get accounts
@@ -61,7 +61,7 @@ const FarcasterIntegration: React.FC<FarcasterIntegrationProps> = ({
       const sdk = (window as any).miniapps;
       
       const provider = sdk && sdk.wallet && sdk.wallet.getEthereumProvider ? 
-        sdk.wallet.getEthereumProvider() : null;
+        await sdk.wallet.getEthereumProvider() : null;
       
       if (!provider) {
         throw new Error("No Farcaster wallet provider found");

@@ -15,6 +15,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['wagmi', '@tanstack/react-query', 'viem']
+    include: ['wagmi', '@tanstack/react-query', 'viem', '@farcaster/miniapp-wagmi-connector'],
+    exclude: ['@farcaster/miniapp-wagmi-connector/node_modules/viem']
   }
 })

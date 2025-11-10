@@ -9,12 +9,30 @@ const isFarcasterEnvironment = typeof window !== 'undefined' && window.miniapps;
 if (isFarcasterEnvironment) {
   // Call ready() to hide splash screen immediately
   try {
-    const sdk = window.miniapps;
-    if (sdk && sdk.actions && sdk.actions.ready) {
-      sdk.actions.ready();
-    }
+    // Try to import the SDK properly
+    import('@farcaster/miniapp-sdk').then(({ sdk }) => {
+      if (sdk && sdk.actions && sdk.actions.ready) {
+        sdk.actions.ready();
+      }
+    }).catch(error => {
+      console.warn("Failed to import Farcaster SDK:", error);
+      // Fallback to direct access
+      const sdk = window.miniapps;
+      if (sdk && sdk.actions && sdk.actions.ready) {
+        sdk.actions.ready();
+      }
+    });
   } catch (error) {
     console.warn("Failed to initialize Farcaster SDK:", error);
+    // Fallback to direct access
+    try {
+      const sdk = window.miniapps;
+      if (sdk && sdk.actions && sdk.actions.ready) {
+        sdk.actions.ready();
+      }
+    } catch (fallbackError) {
+      console.warn("Failed to initialize Farcaster SDK with fallback:", fallbackError);
+    }
   }
 }
 
