@@ -118,8 +118,54 @@ export default function App() {
     // Create contract using the provider - Wagmi will handle signing through the wallet client
     const c = new ethers.Contract(contractAddress, ABI, provider);
     setContract(c as any);
-    (async () => { try { const fee: bigint = await (c as any).devFee(); setDevFee(fee); } catch (e) { console.warn("devFee fetch failed", e); } })();
+    (async () => { 
+      try { 
+        const fee: bigint = await (c as any).devFee(); 
+        console.log("Fetched devFee:", fee);
+        // Ensure it's a proper BigInt
+        const bigIntFee = typeof fee === 'bigint' ? fee : BigInt(fee as any);
+        setDevFee(bigIntFee); 
+      } catch (e) { 
+        console.warn("devFee fetch failed", e); 
+        // Set a default fee if fetch fails
+        setDevFee(0n);
+      } 
+    })();
+    
+    // Periodically refresh the devFee
+    const feeInterval = setInterval(async () => {
+      if (c) {
+        try {
+          const fee: bigint = await (c as any).devFee();
+          console.log("Periodically refreshed devFee:", fee);
+          // Ensure it's a proper BigInt
+          const bigIntFee = typeof fee === 'bigint' ? fee : BigInt(fee as any);
+          setDevFee(bigIntFee);
+        } catch (e) {
+          console.warn("Periodic devFee refresh failed", e);
+        }
+      }
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(feeInterval);
   }, [provider, contractAddress, isConnected]);
+
+  // Function to manually refresh the devFee
+  const refreshDevFee = async () => {
+    if (contract) {
+      try {
+        const fee: bigint = await contract.devFee();
+        console.log("Manually refreshed devFee:", fee);
+        // Ensure it's a proper BigInt
+        const bigIntFee = typeof fee === 'bigint' ? fee : BigInt(fee as any);
+        setDevFee(bigIntFee);
+        setStatus("Developer fee refreshed.");
+      } catch (e) {
+        console.warn("Manual devFee refresh failed", e);
+        setStatus("Failed to refresh developer fee.");
+      }
+    }
+  };
 
   // Event listeners + polling fallback
   useEffect(() => {
@@ -308,50 +354,145 @@ export default function App() {
 
   async function submitMove(newBoard: BoardArray) {
     if (!contract || !gameId) return;
+    
+    // Validate devFee before sending
+    if (typeof devFee !== 'bigint') {
+      setStatus("Invalid fee format. Please refresh the fee.");
+      console.error("Invalid devFee type:", typeof devFee, devFee);
+      return;
+    }
+    
+    // Validate game state before submitting move
     try {
-      setStatus("Submitting move..."); setPending(true);
-      
-      const txHash = await writeContract(config, {
-        address: (await contract.getAddress()) as `0x${string}`,
-        abi: ABI,
-        functionName: 'makeMove',
-        args: [gameId, boardToString(newBoard)],
-        value: devFee
-      });
-      
-      await waitForTransactionReceipt(config, { hash: txHash });
-      
-      // Update the UI after successful transaction
       const g = await contract.games(gameId);
-      setBoard(stringToBoard(g.board));
-      setCurrentTurn(Number(g.turn)); // This is the key fix - update the current turn
-      setStatus("Move recorded."); setPending(false);
-    } catch (error: any) {
-      console.error("Move error:", error);
-      // Check if user rejected the transaction
-      if (error.code === "ACTION_REJECTED" || error.code === 4001 || error.message?.includes("user rejected") || error.message?.includes("User rejected")) {
-        setStatus("Move cancelled.");
-      } 
-      // Check for insufficient funds
-      else if (error.code === "INSUFFICIENT_FUNDS" || error.message?.includes("insufficient funds") || error.message?.includes("gas required exceeds allowance")) {
-        setStatus("Not enough Base ETH in your wallet.");
+      if (!g.active) {
+        setStatus("Game is not active. Please refresh the game state.");
+        setGameActive(false);
+        return;
       }
-      else if (error.message?.includes("VoidSigner")) {
-        setStatus("Wallet not connected properly. Please reconnect your wallet.");
-      }
-      // Handle turn validation errors from the contract
-      else if (error.message?.includes("red's turn") || error.message?.includes("black's turn")) {
+      if (Number(g.turn) !== playerColor) {
         setStatus("It's not your turn to move.");
-        // Refresh the game state to get the correct turn
-        const g = await contract.games(gameId);
         setCurrentTurn(Number(g.turn));
+        return;
       }
-      else {
-        setStatus("Failed to submit move: " + (error.reason || error.message || "Unknown error"));
+    } catch (e) {
+      console.warn("Failed to validate game state", e);
+      setStatus("Unable to validate game state. Please try again.");
+      return;
+    }
+    
+    // Validate board state
+    if (!newBoard || newBoard.length !== 8 || newBoard.some(row => !row || row.length !== 8)) {
+      setStatus("Invalid board state. Please try again.");
+      return;
+    }
+    
+    // Retry mechanism for move submission
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setStatus(`Submitting move${attempt > 1 ? ` (attempt ${attempt}/${maxRetries})` : ''}...`); 
+        setPending(true);
+        
+        // Log the fee being sent for debugging
+        console.log("Sending devFee:", devFee);
+        console.log("DevFee type:", typeof devFee);
+        
+        const txHash = await writeContract(config, {
+          address: (await contract.getAddress()) as `0x${string}`,
+          abi: ABI,
+          functionName: 'makeMove',
+          args: [gameId, boardToString(newBoard)],
+          value: devFee
+        });
+        
+        await waitForTransactionReceipt(config, { hash: txHash });
+        
+        // Update the UI after successful transaction
+        const g = await contract.games(gameId);
+        setBoard(stringToBoard(g.board));
+        setCurrentTurn(Number(g.turn)); // This is the key fix - update the current turn
+        setStatus("Move recorded."); 
+        setPending(false);
+        return; // Success, exit the retry loop
+      } catch (error: any) {
+        console.error(`Move attempt ${attempt} failed:`, error);
+        
+        // If this is the last attempt, handle the error normally
+        if (attempt === maxRetries) {
+          // Check if user rejected the transaction
+          if (error.code === "ACTION_REJECTED" || error.code === 4001 || error.message?.includes("user rejected") || error.message?.includes("User rejected")) {
+            setStatus("Move cancelled.");
+          } 
+          // Check for insufficient funds
+          else if (error.code === "INSUFFICIENT_FUNDS" || error.message?.includes("insufficient funds") || error.message?.includes("gas required exceeds allowance")) {
+            setStatus("Not enough Base ETH in your wallet.");
+          }
+          else if (error.message?.includes("VoidSigner")) {
+            setStatus("Wallet not connected properly. Please reconnect your wallet.");
+          }
+          // Handle turn validation errors from the contract
+          else if (error.message?.includes("red's turn") || error.message?.includes("black's turn")) {
+            setStatus("It's not your turn to move.");
+            // Refresh the game state to get the correct turn
+            const g = await contract.games(gameId);
+            setCurrentTurn(Number(g.turn));
+          }
+          // Handle fee mismatch errors
+          else if (error.message?.includes("fee mismatch")) {
+            setStatus("Fee mismatch: Please check your wallet has sufficient funds and try again.");
+            // Try to refresh the devFee
+            try {
+              const fee: bigint = await contract.devFee();
+              console.log("Refreshed devFee:", fee);
+              // Ensure it's a proper BigInt
+              const bigIntFee = typeof fee === 'bigint' ? fee : BigInt(fee as any);
+              setDevFee(bigIntFee);
+            } catch (e) {
+              console.warn("Failed to refresh devFee", e);
+            }
+          }
+          // Handle CALL_EXCEPTION errors (missing revert data)
+          else if (error.code === "CALL_EXCEPTION" || (error.action === "call" && error.data === null)) {
+            setStatus("Transaction failed. This might be due to network issues or contract state. Please try again.");
+            // Refresh game state to ensure UI is in sync
+            try {
+              const g = await contract.games(gameId);
+              setBoard(stringToBoard(g.board));
+              setCurrentTurn(Number(g.turn));
+              setGameActive(g.active);
+            } catch (e) {
+              console.warn("Failed to refresh game state", e);
+            }
+          }
+          else {
+            setStatus("Failed to submit move: " + (error.reason || error.message || "Unknown error"));
+          }
+          setPending(false);
+        } else {
+          // For retry attempts, wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
       }
-      setPending(false);
     }
   }
+
+  // Function to manually refresh the game state
+  const refreshGameState = async () => {
+    if (!contract || !gameId) return;
+    
+    try {
+      setStatus("Refreshing game state...");
+      const g = await contract.games(gameId);
+      setBoard(stringToBoard(g.board));
+      setCurrentTurn(Number(g.turn));
+      setGameActive(g.active);
+      setStatus("Game state refreshed.");
+    } catch (e) {
+      console.error("Failed to refresh game state", e);
+      setStatus("Failed to refresh game state.");
+    }
+  };
 
   function handleSquareClick(displayR: number, displayC: number) {
     if (!gameActive) { setStatus("Game not active yet."); return; }
@@ -472,6 +613,23 @@ export default function App() {
                 />
                 Transaction pending…
               </motion.div>
+            )}
+            {/* Add refresh buttons when there are issues */}
+            {status?.includes("Fee mismatch") && (
+              <button
+                onClick={refreshDevFee}
+                className="mt-3 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondaryDark transition-colors text-sm font-medium"
+              >
+                Refresh Fee
+              </button>
+            )}
+            {(status?.includes("Transaction failed") || status?.includes("Unable to validate")) && (
+              <button
+                onClick={refreshGameState}
+                className="mt-3 px-4 py-2 bg-accentBlue text-white rounded-lg hover:bg-accentBlueDark transition-colors text-sm font-medium"
+              >
+                Refresh Game State
+              </button>
             )}
           </div>
           <div className="p-6 rounded-3xl bg-white shadow-soft border-3 border-accentBlue/10">
