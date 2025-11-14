@@ -10,6 +10,8 @@ import { motion } from "framer-motion";
 import FarcasterIntegration from "./FarcasterIntegration";
 // Add Wagmi hooks
 import { useAccount, useConnect, usePublicClient, useWalletClient } from 'wagmi';
+import { writeContract, waitForTransactionReceipt } from 'wagmi/actions';
+import { config } from './wagmi';
 
 type BoardArray = number[][]; // 8x8
 
@@ -78,12 +80,6 @@ export default function App() {
         setProvider(ethersProvider);
       }
       
-      if (walletClient && publicClient) {
-        // Create ethers signer from wallet client
-        const ethersSigner = new ethers.VoidSigner(address, new ethers.BrowserProvider(publicClient.transport as any));
-        setSigner(ethersSigner);
-      }
-      
       // Set status based on chain
       if (wagmiChainId === 8453) {
         setStatus("Ready to play!");
@@ -93,9 +89,8 @@ export default function App() {
     } else {
       setStatus("Wallet not connected. Please connect to play.");
     }
-  }, [isConnected, address, wagmiChainId, publicClient, walletClient]);
+  }, [isConnected, address, wagmiChainId, publicClient]);
 
-  // Handle wallet connection (for FarcasterIntegration component)
   const handleWalletConnected = (address: string) => {
     setAddr(address);
   };
@@ -119,11 +114,12 @@ export default function App() {
   }, [chainId]);
 
   useEffect(() => {
-    if (!(provider && signer && contractAddress)) return;
-    const c = new ethers.Contract(contractAddress, ABI, provider).connect(signer);
+    if (!(provider && contractAddress && isConnected)) return;
+    // Create contract using the provider - Wagmi will handle signing through the wallet client
+    const c = new ethers.Contract(contractAddress, ABI, provider);
     setContract(c as any);
     (async () => { try { const fee: bigint = await (c as any).devFee(); setDevFee(fee); } catch (e) { console.warn("devFee fetch failed", e); } })();
-  }, [provider, signer, contractAddress]);
+  }, [provider, contractAddress, isConnected]);
 
   // Event listeners + polling fallback
   useEffect(() => {
@@ -159,8 +155,19 @@ export default function App() {
       const hash = ethers.keccak256(ethers.toUtf8Bytes(createCode));
       setStatus("Creating game..."); setPending(true);
       const initialBoard = boardToString(initBoard());
-      const tx = await contract.createGame(hash, initialBoard);
-      await tx.wait();
+      
+      // Use wagmi's writeContract for proper transaction signing
+      const txHash = await writeContract(config, {
+        address: (await contract.getAddress()) as `0x${string}`,
+        abi: ABI,
+        functionName: 'createGame',
+        args: [hash, initialBoard]
+      });
+      
+      // Wait for transaction confirmation
+      await waitForTransactionReceipt(config, { hash: txHash });
+      
+      // After successful transaction, update the UI
       const next: bigint = await contract.nextGameId();
       setGameId(Number(next));
       setBoard(initBoard());
@@ -176,6 +183,8 @@ export default function App() {
         setStatus("Game creation cancelled.");
       } else if (error.code === "INSUFFICIENT_FUNDS" || error.message?.includes("insufficient funds") || error.message?.includes("gas required exceeds allowance")) {
         setStatus("Not enough Base ETH in your wallet.");
+      } else if (error.message?.includes("VoidSigner")) {
+        setStatus("Wallet not connected properly. Please reconnect your wallet.");
       } else {
         setStatus("Failed to create game: " + (error.reason || error.message || "Unknown error"));
       }
@@ -187,29 +196,34 @@ export default function App() {
     if (!contract || !joinCode) return;
     try {
       setStatus("Joining game..."); setPending(true);
-      const tx = await contract.joinGame(joinCode);
-      await tx.wait();
       
-      // Get the game ID from the GameJoined event
-      const receipt = await tx.wait();
-      const joinEvent = receipt.logs.find((log: any) => {
-        try {
-          const parsed = contract.interface.parseLog(log);
-          return parsed?.name === "GameJoined";
-        } catch { return false; }
+      const txHash = await writeContract(config, {
+        address: (await contract.getAddress()) as `0x${string}`,
+        abi: ABI,
+        functionName: 'joinGame',
+        args: [joinCode]
       });
       
-      if (joinEvent) {
-        const parsed = contract.interface.parseLog(joinEvent);
-        if (parsed) {
-          const joinedGameId = Number(parsed.args[0]);
-          setGameId(joinedGameId);
-          
-          // Fetch initial game state
-          const g = await contract.games(joinedGameId);
-          setBoard(stringToBoard(g.board));
-          setCurrentTurn(Number(g.turn));
-          setGameActive(g.active);
+      const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+      
+      // Get the game ID from the GameJoined event
+      let joinedGameId: number | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          if (parsed?.name === "GameJoined") {
+            joinedGameId = Number(parsed.args[0]);
+            setGameId(joinedGameId);
+            
+            // Fetch initial game state
+            const g = await contract.games(joinedGameId);
+            setBoard(stringToBoard(g.board));
+            setCurrentTurn(Number(g.turn));
+            setGameActive(g.active);
+            break;
+          }
+        } catch { 
+          // Continue to next log if parsing fails
         }
       }
       
@@ -223,6 +237,8 @@ export default function App() {
         setStatus("Join cancelled.");
       } else if (error.code === "INSUFFICIENT_FUNDS" || error.message?.includes("insufficient funds") || error.message?.includes("gas required exceeds allowance")) {
         setStatus("Not enough Base ETH in your wallet.");
+      } else if (error.message?.includes("VoidSigner")) {
+        setStatus("Wallet not connected properly. Please reconnect your wallet.");
       } else {
         setStatus("Failed to join game: " + (error.reason || error.message || "Unknown error"));
       }
@@ -294,8 +310,17 @@ export default function App() {
     if (!contract || !gameId) return;
     try {
       setStatus("Submitting move..."); setPending(true);
-      const tx = await contract.makeMove(gameId, boardToString(newBoard), { value: devFee });
-      await tx.wait();
+      
+      const txHash = await writeContract(config, {
+        address: (await contract.getAddress()) as `0x${string}`,
+        abi: ABI,
+        functionName: 'makeMove',
+        args: [gameId, boardToString(newBoard)],
+        value: devFee
+      });
+      
+      await waitForTransactionReceipt(config, { hash: txHash });
+      
       const g = await contract.games(gameId);
       setBoard(stringToBoard(g.board));
       setCurrentTurn(Number(g.turn));
@@ -309,6 +334,9 @@ export default function App() {
       // Check for insufficient funds
       else if (error.code === "INSUFFICIENT_FUNDS" || error.message?.includes("insufficient funds") || error.message?.includes("gas required exceeds allowance")) {
         setStatus("Not enough Base ETH in your wallet.");
+      }
+      else if (error.message?.includes("VoidSigner")) {
+        setStatus("Wallet not connected properly. Please reconnect your wallet.");
       }
       else {
         setStatus("Failed to submit move: " + (error.reason || error.message || "Unknown error"));
