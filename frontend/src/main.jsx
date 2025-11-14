@@ -3,17 +3,17 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 
-// Function to initialize Farcaster SDK properly
-async function initializeFarcasterSDK() {
+// Immediately call sdk.actions.ready() as per Farcaster documentation
+// This should be called as soon as the app loads
+(async () => {
   try {
-    // Import the SDK dynamically
+    // Import the SDK and call ready() immediately
     const { sdk } = await import('@farcaster/miniapp-sdk');
     
     // Call ready() to hide splash screen
     if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
       await sdk.actions.ready();
       console.log("Farcaster SDK ready() called successfully");
-      return true;
     }
   } catch (error) {
     console.warn("Failed to import or initialize Farcaster SDK:", error);
@@ -24,41 +24,20 @@ async function initializeFarcasterSDK() {
       try {
         await window.miniapps.actions.ready();
         console.log("Farcaster SDK ready() called via global fallback");
-        return true;
       } catch (fallbackError) {
         console.error("Fallback ready() call also failed:", fallbackError);
       }
     }
   }
-  
-  return false;
-}
+})();
 
-// Initialize Farcaster SDK
-let isFarcasterEnvironment = false;
-
-// Check if we might be in a Farcaster environment
-if (typeof window !== 'undefined') {
-  isFarcasterEnvironment = !!(
-    window.miniapps || 
-    window.location.hostname.includes('farcaster') ||
-    window.location.search.includes('farcaster') ||
-    window.location.hash.includes('farcaster')
-  );
-}
-
-// If we're likely in a Farcaster environment, initialize the SDK
-if (isFarcasterEnvironment) {
-  initializeFarcasterSDK().then(initialized => {
-    if (initialized) {
-      console.log("Farcaster environment initialized");
-    } else {
-      console.log("Not a Farcaster environment or initialization failed");
-    }
-  }).catch(error => {
-    console.error("Error during Farcaster SDK initialization:", error);
-  });
-}
+// Check if we're in a Farcaster environment for rendering logic
+const isFarcasterEnvironment = typeof window !== 'undefined' && (
+  window.miniapps || 
+  window.location.hostname.includes('farcaster') ||
+  window.location.search.includes('farcaster') ||
+  window.location.hash.includes('farcaster')
+);
 
 // If not in Farcaster environment, import and use Wagmi
 if (!isFarcasterEnvironment) {
