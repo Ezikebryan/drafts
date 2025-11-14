@@ -131,7 +131,7 @@ export default function App() {
     const onMove = (mGameId: bigint, player: string, newBoardStr: string, nextTurn: number) => {
       if (Number(mGameId) !== gameId) return;
       setBoard(stringToBoard(newBoardStr));
-      setCurrentTurn(Number(nextTurn));
+      setCurrentTurn(Number(nextTurn)); // This is the key fix - update the current turn from the event
       setMoveLog(l => [player.slice(0,6)+"…"+player.slice(-4)+" → turn="+Number(nextTurn), ...l].slice(0,10));
       setPending(false);
     };
@@ -142,7 +142,7 @@ export default function App() {
       try {
         const g = await contract.games(gameId);
         setGameActive(g.active);
-        setCurrentTurn(Number(g.turn));
+        setCurrentTurn(Number(g.turn)); // Also update turn in polling
         setBoard(stringToBoard(g.board));
       } catch {}
     }, 2000);
@@ -171,8 +171,8 @@ export default function App() {
       const next: bigint = await contract.nextGameId();
       setGameId(Number(next));
       setBoard(initBoard());
-      setPlayerColor(0);
-      setCurrentTurn(0);
+      setPlayerColor(0); // Creator is always red (playerColor 0)
+      setCurrentTurn(0); // Red goes first (turn 0)
       setGameActive(false);
       setSelectedSquare(null);
       setStatus(`Game #${Number(next)} created. Share code "${createCode}" with opponent.`);
@@ -227,7 +227,7 @@ export default function App() {
         }
       }
       
-      setPlayerColor(1);
+      setPlayerColor(1); // Joiner is always black (playerColor 1)
       setSelectedSquare(null);
       setStatus("Successfully joined! Game starting...");
       setPending(false);
@@ -321,9 +321,10 @@ export default function App() {
       
       await waitForTransactionReceipt(config, { hash: txHash });
       
+      // Update the UI after successful transaction
       const g = await contract.games(gameId);
       setBoard(stringToBoard(g.board));
-      setCurrentTurn(Number(g.turn));
+      setCurrentTurn(Number(g.turn)); // This is the key fix - update the current turn
       setStatus("Move recorded."); setPending(false);
     } catch (error: any) {
       console.error("Move error:", error);
@@ -337,6 +338,13 @@ export default function App() {
       }
       else if (error.message?.includes("VoidSigner")) {
         setStatus("Wallet not connected properly. Please reconnect your wallet.");
+      }
+      // Handle turn validation errors from the contract
+      else if (error.message?.includes("red's turn") || error.message?.includes("black's turn")) {
+        setStatus("It's not your turn to move.");
+        // Refresh the game state to get the correct turn
+        const g = await contract.games(gameId);
+        setCurrentTurn(Number(g.turn));
       }
       else {
         setStatus("Failed to submit move: " + (error.reason || error.message || "Unknown error"));
