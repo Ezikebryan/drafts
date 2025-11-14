@@ -8,6 +8,8 @@ import JoinGame from "./JoinGame";
 import GameRoomHeader from "./GameRoomHeader";
 import { motion } from "framer-motion";
 import FarcasterIntegration from "./FarcasterIntegration";
+// Add Wagmi hooks
+import { useAccount, useConnect, usePublicClient, useWalletClient } from 'wagmi';
 
 type BoardArray = number[][]; // 8x8
 
@@ -29,6 +31,12 @@ export default function App() {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [devFee, setDevFee] = useState<bigint>(0n);
 
+  // Wagmi hooks
+  const { isConnected, address, chainId: wagmiChainId } = useAccount();
+  const { connect, connectors } = useConnect();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
   // Game
   const [createCode, setCreateCode] = useState<string>("");
   const [joinCode, setJoinCode] = useState<string>("");
@@ -43,35 +51,53 @@ export default function App() {
   const [moveLog, setMoveLog] = useState<string[]>([]);
   const [validMoves, setValidMoves] = useState<[number, number][]>([]);
 
+  // Auto-connect to Farcaster wallet if available
+  useEffect(() => {
+    if (connectors[0] && !isConnected) {
+      // Try to connect automatically
+      connect({ connector: connectors[0] });
+    }
+  }, [connectors, isConnected, connect]);
+
+  // Update address and chain when Wagmi state changes
+  useEffect(() => {
+    if (isConnected && address) {
+      setAddr(address);
+    }
+    if (wagmiChainId) {
+      setChainId(wagmiChainId);
+    }
+  }, [isConnected, address, wagmiChainId]);
+
+  // Handle wallet connection using Wagmi
+  useEffect(() => {
+    if (isConnected && address) {
+      // Create ethers provider from Wagmi clients
+      if (publicClient) {
+        const ethersProvider = new ethers.BrowserProvider(publicClient.transport as any);
+        setProvider(ethersProvider);
+      }
+      
+      if (walletClient && publicClient) {
+        // Create ethers signer from wallet client
+        const ethersSigner = new ethers.VoidSigner(address, new ethers.BrowserProvider(publicClient.transport as any));
+        setSigner(ethersSigner);
+      }
+      
+      // Set status based on chain
+      if (wagmiChainId === 8453) {
+        setStatus("Ready to play!");
+      } else {
+        setStatus("⚠️ Wrong Network! This app only works on Base mainnet. Please switch to Base (chain ID: 8453).");
+      }
+    } else {
+      setStatus("Wallet not connected. Please connect to play.");
+    }
+  }, [isConnected, address, wagmiChainId, publicClient, walletClient]);
+
+  // Handle wallet connection (for FarcasterIntegration component)
   const handleWalletConnected = (address: string) => {
     setAddr(address);
-    
-    // Initialize ethers provider with the connected wallet
-    const ethereumProvider = (window as any).miniapps?.wallet?.getEthereumProvider?.();
-    if (ethereumProvider) {
-      const p = new ethers.BrowserProvider(ethereumProvider);
-      setProvider(p);
-      
-      (async () => {
-        try {
-          const s = await p.getSigner();
-          setSigner(s);
-          const net = await p.getNetwork();
-          const currentChainId = Number(net.chainId);
-          setChainId(currentChainId);
-          
-          // STRICTLY enforce Base mainnet ONLY
-          if (currentChainId !== 8453) {
-            setStatus("⚠️ Wrong Network! This app only works on Base mainnet. Please switch to Base (chain ID: 8453).");
-          } else {
-            setStatus("Ready to play!");
-          }
-        } catch (error: any) {
-          console.error("Wallet connection error:", error);
-          setStatus("Failed to connect wallet: " + error.message);
-        }
-      })();
-    }
   };
 
   const handleWalletDisconnected = () => {
@@ -82,67 +108,7 @@ export default function App() {
     setStatus("Wallet disconnected. Please connect to play.");
   };
 
-  useEffect(() => {
-    const eth: any = (window as any).ethereum || (window as any).miniapps?.ethereum || null;
-    if (!eth) { setStatus("No Ethereum provider found. Please install MetaMask or use Farcaster miniapp."); return; }
-    const p = new ethers.BrowserProvider(eth);
-    setProvider(p);
-    (async () => {
-      try {
-        await eth.request({ method: "eth_requestAccounts" });
-        const s = await p.getSigner();
-        setSigner(s);
-        setAddr(await s.getAddress());
-        const net = await p.getNetwork();
-        const currentChainId = Number(net.chainId);
-        setChainId(currentChainId);
-        
-        // STRICTLY enforce Base mainnet ONLY
-        if (currentChainId !== 8453) {
-          setStatus("⚠️ Wrong Network! This app only works on Base mainnet. Please switch to Base (chain ID: 8453).");
-          // Attempt to switch to Base mainnet
-          try {
-            await eth.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x2105' }], // 8453 in hex
-            });
-          } catch (switchError: any) {
-            // This error code indicates that the chain has not been added to MetaMask
-            if (switchError.code === 4902) {
-              try {
-                await eth.request({
-                  method: 'wallet_addEthereumChain',
-                  params: [
-                    {
-                      chainId: '0x2105',
-                      chainName: 'Base',
-                      nativeCurrency: {
-                        name: 'Ether',
-                        symbol: 'ETH',
-                        decimals: 18,
-                      },
-                      rpcUrls: ['https://mainnet.base.org'],
-                      blockExplorerUrls: ['https://basescan.org'],
-                    },
-                  ],
-                });
-              } catch (addError) {
-                setStatus("Failed to add Base network. Please add it manually to your wallet.");
-              }
-            } else {
-              setStatus("Failed to switch to Base network. Please switch manually in your wallet.");
-            }
-          }
-        } else {
-          setStatus("Ready to play!");
-        }
-      } catch (error: any) {
-        console.error("Wallet connection error:", error);
-        setStatus("Failed to connect wallet: " + error.message);
-      }
-    })();
-  }, []);
-
+  // Contract setup
   const contractAddress = useMemo(() => {
     // Strictly require Base mainnet (chain ID 8453) for production
     if (chainId === 8453) {

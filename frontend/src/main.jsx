@@ -31,16 +31,8 @@ import App from "./App.tsx";
   }
 })();
 
-// Check if we're in a Farcaster environment for rendering logic
-const isFarcasterEnvironment = typeof window !== 'undefined' && (
-  window.miniapps || 
-  window.location.hostname.includes('farcaster') ||
-  window.location.search.includes('farcaster') ||
-  window.location.hash.includes('farcaster')
-);
-
-// If not in Farcaster environment, import and use Wagmi
-if (!isFarcasterEnvironment) {
+// Function to render the app with Wagmi provider
+function renderAppWithProviders() {
   import('./wagmi.ts').then(({ config }) => {
     import('wagmi').then(({ WagmiProvider }) => {
       import('@tanstack/react-query').then(({ QueryClient, QueryClientProvider }) => {
@@ -58,7 +50,7 @@ if (!isFarcasterEnvironment) {
       });
     });
   });
-} else {
-  // In Farcaster environment, render app directly
-  createRoot(document.getElementById("root")).render(<App />);
 }
+
+// Always use Wagmi provider, regardless of environment
+renderAppWithProviders();
